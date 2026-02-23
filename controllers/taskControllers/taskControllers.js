@@ -10,6 +10,10 @@ import AnswerPdf from "../../models/EvaluationModels/studentAnswerPdf.js";
 import Schema from "../../models/schemeModel/schema.js";
 import sharp from "sharp";
 
+import BookletTask from "../../models/taskModels/bookletTaskModel.js";
+import BookletAnswerPdf from "../../models/EvaluationModels/bookletAnswerPdfModel.js";
+import BookletAnswerPdfImage from "../../models/EvaluationModels/bookletAnswerPdfImageModel.js";
+
 import QuestionDefinition from "../../models/schemeModel/questionDefinitionSchema.js";
 import mongoose from "mongoose";
 import extractImagesFromPdf from "./extractImagesFromPDF.js";
@@ -891,6 +895,8 @@ const assigningTask = async (req, res) => {
     const subjectTaskIds = await Task.find({ subjectCode: primarySubjectCode })
       .session(session)
       .distinct("_id");
+      
+    console.log("subject Task Id", subjectTaskIds);
 
     // const allocated = await AnswerPdf.countDocuments({
     //   taskId: { $in: subjectTaskIds },
@@ -917,7 +923,7 @@ const assigningTask = async (req, res) => {
     const allocated = (
       await AnswerPdf.distinct("answerPdfName", {
         taskId: { $in: subjectTaskIds },
-      })
+      }).session(session)
     ).length;
 
     console.log("allocated", allocated);
@@ -937,7 +943,7 @@ const assigningTask = async (req, res) => {
       {
         $count: "evaluation_pending",
       },
-    ]);
+    ]).session(session);
 
     const evaluation_pending = evaluationPendingAgg[0]?.evaluation_pending || 0;
     console.log("evaluatedpending", evaluation_pending);
@@ -957,7 +963,7 @@ const assigningTask = async (req, res) => {
       {
         $count: "evaluated",
       },
-    ]);
+    ]).session(session);
 
     const evaluated = evaluatedAgg[0]?.evaluated || 0;
 
@@ -970,6 +976,7 @@ const assigningTask = async (req, res) => {
     const totalFiles = fs
       .readdirSync(primaryFolder)
       .filter((f) => f.endsWith(".pdf")).length;
+      console.log("Total files are", totalFiles)
 
     await SubjectFolderModel.findOneAndUpdate(
       { folderName: primarySubjectCode },
@@ -1000,6 +1007,116 @@ const assigningTask = async (req, res) => {
     }
     console.error("Error assigning task:", error);
     res.status(500).json({ error: error.message || "An error occurred." });
+  } finally {
+    session.endSession();
+  }
+};
+
+const assignBookletWiseTask = async (req, res) => {
+  const { userId, subjectCode, bookletsToAssign } = req.body;
+
+  if (!userId || !subjectCode || !bookletsToAssign) {
+    return res.status(400).json({ message: "All fields are required." });
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const user = await User.findById(userId).session(session);
+    if (!user) throw new Error("User not found");
+
+    const subjectFolder = path.join(
+      __dirname,
+      "processedFolder",
+      subjectCode
+    );
+
+    if (!fs.existsSync(subjectFolder)) {
+      throw new Error("Subject folder not found");
+    }
+
+    const allPdfs = fs
+      .readdirSync(subjectFolder)
+      .filter((file) => file.endsWith(".pdf"));
+
+    const pdfsToAssign = allPdfs.slice(0, bookletsToAssign);
+
+    if (!pdfsToAssign.length) {
+      throw new Error("No PDFs available");
+    }
+
+    // 🔹 Create Booklet Task
+    const bookletTask = new BookletTask({
+      subjectCode,
+      userId,
+      totalBooklets: pdfsToAssign.length,
+      status: "inactive",
+    });
+
+    await bookletTask.save({ session });
+
+    // 🔹 Save BookletAnswerPdf
+    const bookletDocs = pdfsToAssign.map((pdf) => ({
+      bookletTaskId: bookletTask._id,
+      answerPdfName: pdf,
+      assignedDate: new Date(),
+    }));
+
+    await BookletAnswerPdf.insertMany(bookletDocs, { session });
+
+    await session.commitTransaction();
+
+    res.status(201).json({
+      message: "Booklet-wise assignment successful",
+      assignedCount: pdfsToAssign.length,
+    });
+
+    // 🔹 Background Extraction (Full PDF pages)
+    setImmediate(async () => {
+      for (const pdf of pdfsToAssign) {
+        const pdfPath = path.join(subjectFolder, pdf);
+
+        const bookletName = path.basename(pdf, ".pdf");
+        const outputFolder = path.join(
+          subjectFolder,
+          "bookletWiseExtracted",
+          bookletName
+        );
+
+        fs.mkdirSync(outputFolder, { recursive: true });
+
+        const imageFiles = await extractImagesFromPdf(
+          pdfPath,
+          outputFolder
+        );
+
+        const pdfDoc = await BookletAnswerPdf.findOne({
+          bookletTaskId: bookletTask._id,
+          answerPdfName: pdf,
+        });
+
+        const imageDocs = imageFiles.map((img) => {
+          const match = img.match(/image_(\d+)\.png$/);
+          return {
+            bookletAnswerPdfId: pdfDoc._id,
+            name: img,
+            page: match ? parseInt(match[1]) : 1,
+          };
+        });
+
+        if (imageDocs.length) {
+          await BookletAnswerPdfImage.insertMany(imageDocs);
+        }
+      }
+    });
+
+  } catch (error) {
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
+    res.status(500).json({ error: error.message });
   } finally {
     session.endSession();
   }
@@ -3408,7 +3525,7 @@ const getQuestionDefinitionTaskId = async (req, res) => {
     const subject = await Subject.findOne({ code: task.subjectCode });
 
     if (!subject) {
-      return res
+      return res 
         .status(404)
         .json({ message: "Subject not found (create subject)." });
     }
@@ -4244,6 +4361,37 @@ const completedBookletHandler = async (req, res) => {
     // task.totalBooklets -= 1;
     // await task.save();
 
+    const pendingExists = await AnswerPdf.exists({
+      answerPdfName: answerPdfDoc.answerPdfName,
+      status: "false",
+    });
+
+    if (!pendingExists) {
+      await SubjectFolderModel.updateOne(
+        { folderName: task.subjectCode },
+        {
+          $inc: {
+            evaluated: 1,
+            evaluation_pending: -1,
+            allocated: -1,
+          },
+        }
+      );
+    }
+
+    // const subjectFolderDetails = await SubjectFolderModel.findOne({
+    //   folderName: task.subjectCode,
+    // });
+    // if (!subjectFolderDetails) {
+    //   return res.status(404).json({ message: "Subject folder not found" });
+    // }
+
+    // // Update folder details
+    // subjectFolderDetails.evaluated += 1;
+    // subjectFolderDetails.evaluation_pending -= 1;
+    // subjectFolderDetails.allocated -= 1;
+    // await subjectFolderDetails.save();
+
     if (task.currentFileIndex < task.totalBooklets) {
       task.currentFileIndex += 1;
       task.status = "active";
@@ -4269,19 +4417,6 @@ const completedBookletHandler = async (req, res) => {
         taskCompleted: true,
       });
     }
-
-    const subjectFolderDetails = await SubjectFolderModel.findOne({
-      folderName: task.subjectCode,
-    });
-    if (!subjectFolderDetails) {
-      return res.status(404).json({ message: "Subject folder not found" });
-    }
-
-    // Update folder details
-    subjectFolderDetails.evaluated += 1;
-    subjectFolderDetails.evaluation_pending -= 1;
-    // subjectFolderDetails.allocated -= 1;
-    await subjectFolderDetails.save();
 
     // Check if all booklets are completed
     // if (task.totalBooklets === 0) {
@@ -4735,4 +4870,5 @@ export {
   getReassignedbooklets,
   createScannerTask,
   getAllScannerTasks,
+  assignBookletWiseTask,
 };

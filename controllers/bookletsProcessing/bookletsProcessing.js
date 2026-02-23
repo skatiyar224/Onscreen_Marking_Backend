@@ -718,11 +718,11 @@ const processBooklets = async (subjectCode, socketNamespace) => {
         const isValid = totalPages === schema.numberOfPage;
         const targetFolder = isValid ? processedFolderPath : rejectedFolderPath;
 
-        const ext = path.extname(pdfFile);
-        const base = path.basename(pdfFile, ext);
-        const uniqueName = `${base}_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+        // const ext = path.extname(pdfFile);
+        // const base = path.basename(pdfFile, ext);  
+        // const uniqueName = `${base}_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
 
-        fs.copyFileSync(pdfPath, path.join(targetFolder, uniqueName));
+        fs.copyFileSync(pdfPath, path.join(targetFolder, pdfFile));  //For unique name use "uniqueName" instead of "pdfFile"
         fs.unlinkSync(pdfPath);
 
         if (isValid) processedCount++;

@@ -25,6 +25,7 @@ import {
     getAllScannerTasks,
 
     reviewerRejectTask,
+    assignBookletWiseTask,
     getDataprincipalSide,
     assignReviewerRollbackTask
     // generatePdfForCompletedBooklet
@@ -37,6 +38,7 @@ import authMiddleware from "../../Middlewares/authMiddleware.js";
 /* -------------------------------------------------------------------------- */
 
 router.post("/create/task", assigningTask);
+router.post("/create/bookletwise/task", assignBookletWiseTask);
 router.post("/create/scanner/task", createScannerTask);
 router.post("/autoassign/task", autoAssigning);
 router.post("/reassign/pending-booklets", reassignPendingBooklets);

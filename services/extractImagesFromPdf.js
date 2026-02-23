@@ -88,7 +88,7 @@
 
 // export default extractImagesFromPdf;
 
-//THIS IS FOR THE WINDOWS 
+// THIS IS FOR THE WINDOWS 
 
 // import fs from "fs";
 // import path from "path";

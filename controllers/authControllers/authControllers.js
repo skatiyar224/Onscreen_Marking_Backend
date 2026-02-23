@@ -662,9 +662,10 @@ const otpSend = async (req, res) => {
     const { email } = req.body;
 
     const user = await User.findOne({ email });
+    console.log("User is:",user)
     if (!user) {
       // security-friendly response (optional)
-      return res.json({ message: "OTP sent successfully" });
+      return res.json({ message: "USER DOESN'T EXIST", status: false });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000);
@@ -682,7 +683,7 @@ const otpSend = async (req, res) => {
 
     await sendEmailSendotp(email, `Your OTP is ${otp}. It will expire in 5 minutes.`);
 
-    res.json({ message: "OTP sent successfully" });
+    res.json({ message: "OTP sent successfully", status: true });
   } catch (error) {
     console.error("OTP Send Error:", error.message);
     res.status(500).json({ message: "Failed to send OTP" });

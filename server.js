@@ -4,6 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Server } from "socket.io";
+import multer from "multer";
 import http from "http";
 import database from "./utils/database.js";
 import createInitialUser from "./services/initialUserCreation.js";
@@ -145,6 +146,9 @@ app.use((err, req, res, next) => {
       message: "Only single PDF file or ZIP folder is allowed",
     });
   }
+
+  
+    console.log("🔥 REAL ERROR:", err)
 
   // Fallback
   return res.status(500).json({

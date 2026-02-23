@@ -1,0 +1,41 @@
+{
+  "annotations": [
+    {
+      "id": "2/21/2026, 12:20:19 PM",
+      "taskId": "6999548ff147932c7576d6b4",
+      "page": "5",
+      "answerPdfImageId": "699954dcf147932c7576d753",
+      "answerPdfId": "6999549cf147932c7576d6e5",
+      "userId": "6999547ef147932c7576d686",
+      "iconUrl": "/check.png",
+      "question": 1,
+      "timeStamps": "2/21/2026, 12:20:19 PM",
+      "x": 330.625,
+      "y": 244.421875,
+      "width": 150,
+      "height": 80,
+      "synced": false,
+      "mark": 1,
+      "parentQuestionId": null
+    },
+    {
+      "id": "2/21/2026, 12:20:25 PM",
+      "taskId": "6999548ff147932c7576d6b4",
+      "page": "5",
+      "answerPdfImageId": "699954dcf147932c7576d753",
+      "answerPdfId": "6999549cf147932c7576d6e5",
+      "userId": "6999547ef147932c7576d686",
+      "iconUrl": "/check.png",
+      "question": 1,
+      "timeStamps": "2/21/2026, 12:20:25 PM",
+      "x": 859.625,
+      "y": 247.421875,
+      "width": 150,
+      "height": 80,
+      "synced": false,
+      "mark": 1,
+      "parentQuestionId": null
+    }
+  ],
+  "comments": []
+}
