@@ -407,11 +407,24 @@ const generateResult = async (req, res) => {
     /* ------------------------------------------------------------ */
 
     const finalResults = csvData.map((row) => {
-      const match = generatingResults.find((r) => r.BARCODE == row.BARCODE);
-
-      if (match) return { ...row, ...match };
-
-      return { ...row, RESULT: "Not Fully Evaluated" };
+      const match = generatingResults.find(
+        (r) =>
+          String(r.BARCODE).trim() === String(row.BARCODE).trim()
+      );
+    
+      if (match) {
+        const { BARCODE, ...resultData } = match;
+      
+        return {
+          ...row,
+          ...resultData,
+        };
+      }
+    
+      return {
+        ...row,
+        RESULT: "Not Fully Evaluated",
+      };
     });
 
     /* ------------------------------------------------------------ */
@@ -444,6 +457,7 @@ const generateResult = async (req, res) => {
     });
   }
 };
+
 const getPreviousResult = async (req, res) => {
   const { subjectcode } = req.query;
 
